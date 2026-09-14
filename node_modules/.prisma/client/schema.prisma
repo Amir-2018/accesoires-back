@@ -1,0 +1,246 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  client
+  agent
+  supervisor
+}
+
+enum OrderStatus {
+  en_attente
+  validee
+  expediee
+  livree
+}
+
+enum MessageAuthorRole {
+  client
+  agent
+  supervisor
+  system
+}
+
+enum ConversationStatus {
+  nouveau
+  en_cours
+  en_attente
+  resolu
+  escalade
+}
+
+enum ConversationPriority {
+  basse
+  normale
+  haute
+  urgente
+}
+
+enum AiDraftStatus {
+  brouillon
+  approuvee
+  envoyee
+  rejetee
+}
+
+model User {
+  id                    String                @id @default(cuid())
+  username              String                @unique
+  email                 String                @unique
+  passwordHash          String
+  role                  UserRole              @default(client)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  orders                Order[]
+  messages              OrderMessage[]
+  customerConversations Conversation[]        @relation("CustomerConversations")
+  assignedConversations Conversation[]        @relation("AssignedConversations")
+  messageRevisions      MessageRevision[]
+  auditEvents           AuditEvent[]
+  conversationMessages  ConversationMessage[]
+  createdDrafts         AiDraft[]             @relation("CreatedDrafts")
+  approvedDrafts        AiDraft[]             @relation("ApprovedDrafts")
+}
+
+model Article {
+  id          String      @id
+  nom         String
+  image       String
+  description String
+  prix        Int
+  stock       Int
+  categorie   String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  items       OrderItem[]
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  nom       String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id              String         @id @default(cuid())
+  reference       String         @unique
+  clientId        String?
+  guestTokenHash  String?
+  clientNom       String
+  clientPrenom    String?
+  clientEmail     String?
+  clientTelephone String?
+  clientAdresse   String?
+  total           Int
+  status          OrderStatus    @default(en_attente)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  client          User?          @relation(fields: [clientId], references: [id])
+  items           OrderItem[]
+  messages        OrderMessage[]
+  conversations   Conversation[]
+
+  @@index([clientId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  articleId String
+  nom       String
+  prix      Int
+  quantite  Int
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  article   Article @relation(fields: [articleId], references: [id])
+
+  @@index([orderId])
+}
+
+model OrderMessage {
+  id         String            @id @default(cuid())
+  orderId    String
+  authorId   String?
+  authorRole MessageAuthorRole
+  authorNom  String
+  text       String
+  createdAt  DateTime          @default(now())
+  order      Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  author     User?             @relation(fields: [authorId], references: [id])
+
+  @@index([orderId, createdAt])
+}
+
+model Conversation {
+  id              String                @id @default(cuid())
+  customerId      String?
+  orderId         String?
+  status          ConversationStatus    @default(nouveau)
+  priority        ConversationPriority  @default(normale)
+  channel         String                @default("web")
+  language        String                @default("fr")
+  intent          String?
+  sentiment       String?
+  urgencyScore    Int                   @default(0)
+  assignedAgentId String?
+  escalatedAt     DateTime?
+  resolvedAt      DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  customer        User?                 @relation("CustomerConversations", fields: [customerId], references: [id])
+  assignedAgent   User?                 @relation("AssignedConversations", fields: [assignedAgentId], references: [id])
+  order           Order?                @relation(fields: [orderId], references: [id])
+  messages        ConversationMessage[]
+  drafts          AiDraft[]
+  audits          AuditEvent[]
+
+  @@index([status, priority])
+  @@index([assignedAgentId, status])
+}
+
+model ConversationMessage {
+  id             String            @id @default(cuid())
+  conversationId String
+  authorId       String?
+  authorRole     MessageAuthorRole
+  authorNom      String
+  text           String
+  version        Int               @default(1)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  author         User?             @relation(fields: [authorId], references: [id])
+  revisions      MessageRevision[]
+
+  @@index([conversationId, createdAt])
+}
+
+model MessageRevision {
+  id        String              @id @default(cuid())
+  messageId String
+  editorId  String?
+  version   Int
+  text      String
+  createdAt DateTime            @default(now())
+  message   ConversationMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  editor    User?               @relation(fields: [editorId], references: [id])
+
+  @@index([messageId, version])
+}
+
+model KnowledgeArticle {
+  id        String   @id @default(cuid())
+  title     String
+  category  String
+  content   String
+  status    String   @default("brouillon")
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, category])
+}
+
+model AiDraft {
+  id             String        @id @default(cuid())
+  conversationId String
+  generatedText  String
+  editedText     String?
+  status         AiDraftStatus @default(brouillon)
+  confidence     Int
+  model          String
+  sources        Json
+  createdById    String?
+  approvedById   String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  conversation   Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdBy      User?         @relation("CreatedDrafts", fields: [createdById], references: [id])
+  approvedBy     User?         @relation("ApprovedDrafts", fields: [approvedById], references: [id])
+
+  @@index([conversationId, status])
+}
+
+model AuditEvent {
+  id             String        @id @default(cuid())
+  conversationId String?
+  actorId        String?
+  action         String
+  entity         String
+  entityId       String
+  before         Json?
+  after          Json?
+  createdAt      DateTime      @default(now())
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  actor          User?         @relation(fields: [actorId], references: [id])
+
+  @@index([entity, entityId, createdAt])
+}
