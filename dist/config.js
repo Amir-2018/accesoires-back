@@ -6,6 +6,7 @@ for (const key of required) {
 }
 export const config = {
     port: Number(process.env.PORT ?? 4000),
+    
     frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:3000",
     jwtSecret: new TextEncoder().encode(process.env.JWT_SECRET),
     jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "1d",
