@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -72,14 +72,39 @@ model User {
 model Article {
   id          String      @id
   nom         String
-  image       String
-  description String
+  image       String      @db.LongText
+  description String      @db.Text
   prix        Int
   stock       Int
   categorie   String
+  promotionId String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   items       OrderItem[]
+  promotion   Promotion?  @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+
+  @@index([promotionId])
+}
+
+model Promotion {
+  id                String    @id @default(cuid())
+  slug              String    @unique
+  discountPercent   Int
+  badge             String
+  kicker            String
+  title             String
+  description       String    @db.Text
+  image             String    @db.LongText
+  imageAlt          String    @db.VarChar(255)
+  detailTitle       String
+  detailDescription String    @db.Text
+  highlights        Json
+  startDate         DateTime  @db.Date
+  endDate           DateTime  @db.Date
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  articles          Article[]
 }
 
 model Category {
@@ -98,8 +123,12 @@ model Order {
   clientPrenom    String?
   clientEmail     String?
   clientTelephone String?
-  clientAdresse   String?
+  clientAdresse   String?        @db.Text
+  subtotal        Float?
+  discountTotal   Float?
+  promotionSlug   String?
   total           Int
+  totalExact      Float?
   status          OrderStatus    @default(en_attente)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -114,14 +143,18 @@ model Order {
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
-  orderId   String
-  articleId String
-  nom       String
-  prix      Int
-  quantite  Int
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  article   Article @relation(fields: [articleId], references: [id])
+  id              String  @id @default(cuid())
+  orderId         String
+  articleId       String
+  nom             String
+  prix            Int
+  prixOriginal    Float?
+  prixRemise      Float?
+  discountPercent Int?
+  promotionSlug   String?
+  quantite        Int
+  order           Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  article         Article @relation(fields: [articleId], references: [id])
 
   @@index([orderId])
 }
@@ -132,7 +165,7 @@ model OrderMessage {
   authorId   String?
   authorRole MessageAuthorRole
   authorNom  String
-  text       String
+  text       String            @db.Text
   createdAt  DateTime          @default(now())
   order      Order             @relation(fields: [orderId], references: [id], onDelete: Cascade)
   author     User?             @relation(fields: [authorId], references: [id])
@@ -173,7 +206,7 @@ model ConversationMessage {
   authorId       String?
   authorRole     MessageAuthorRole
   authorNom      String
-  text           String
+  text           String            @db.Text
   version        Int               @default(1)
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
@@ -189,7 +222,7 @@ model MessageRevision {
   messageId String
   editorId  String?
   version   Int
-  text      String
+  text      String              @db.Text
   createdAt DateTime            @default(now())
   message   ConversationMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
   editor    User?               @relation(fields: [editorId], references: [id])
@@ -201,7 +234,7 @@ model KnowledgeArticle {
   id        String   @id @default(cuid())
   title     String
   category  String
-  content   String
+  content   String   @db.Text
   status    String   @default("brouillon")
   version   Int      @default(1)
   createdAt DateTime @default(now())
@@ -213,8 +246,8 @@ model KnowledgeArticle {
 model AiDraft {
   id             String        @id @default(cuid())
   conversationId String
-  generatedText  String
-  editedText     String?
+  generatedText  String        @db.Text
+  editedText     String?       @db.Text
   status         AiDraftStatus @default(brouillon)
   confidence     Int
   model          String

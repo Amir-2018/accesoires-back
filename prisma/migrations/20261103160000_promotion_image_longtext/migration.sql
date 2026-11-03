@@ -1,0 +1,1 @@
+ALTER TABLE `Promotion` MODIFY `image` LONGTEXT NOT NULL;

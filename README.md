@@ -1,6 +1,6 @@
 # ZEN Backend
 
-API Express + Prisma + PostgreSQL de l’application ZEN.
+API Express + Prisma + MySQL de l’application ZEN.
 
 ## Configuration
 
@@ -8,7 +8,9 @@ API Express + Prisma + PostgreSQL de l’application ZEN.
 cp backend/.env.example backend/.env
 ```
 
-Configurer au minimum `DATABASE_URL` et `JWT_SECRET`. Ne jamais committer `backend/.env`.
+Configurer au minimum `DATABASE_URL` et `JWT_SECRET`. La valeur `DATABASE_URL` doit commencer par `mysql://`; par exemple `mysql://user:password@127.0.0.1:3306/ouou`. Ne jamais committer `backend/.env`.
+
+Les promotions sont actives du début à la fin de leur période, dates incluses. Le backend évalue ces dates en UTC. Les images de promotion peuvent être envoyées depuis le formulaire superviseur (PNG, JPG, WebP ou GIF, 6 Mo maximum). Après une modification du schéma, appliquer `npm run prisma:push` ou les migrations SQL dans `prisma/migrations`, puis régénérer le client Prisma et lancer `npm run prisma:seed`.
 
 Depuis la racine du dépôt :
 
@@ -25,6 +27,7 @@ L’API écoute par défaut sur `http://localhost:4000`.
 
 - Authentification : `/api/auth/*`
 - Catalogue : `/api/articles/*`
+- Promotions publiques : `GET /api/promotions` et `GET /api/promotions/:slug`; gestion réservée aux superviseurs sous `/api/promotions/admin` et pour les écritures.
 - Commandes et messages : `/api/orders/*`
 - Conversations, brouillons, validation, envoi et escalade : `/api/conversations/*`
 - FAQ CRUD et recherche : `/api/conversations/knowledge/articles`
@@ -38,4 +41,4 @@ Le seed crée les comptes et les données de base décrits dans [../examples/dem
 
 ## Limites
 
-Le provider IA est optionnel. Avec `AI_PROVIDER=fallback`, les réponses utilisent la recherche locale dans les FAQ. Une base PostgreSQL joignable est nécessaire pour les conversations, commandes, FAQ et indicateurs.
+Le provider IA est optionnel. Avec `AI_PROVIDER=fallback`, les réponses utilisent la recherche locale dans les FAQ. Une base MySQL joignable est nécessaire pour les conversations, commandes, FAQ et indicateurs.

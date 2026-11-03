@@ -12,6 +12,57 @@ const articles = [
   { id: "a-sneakers", nom: "Sneakers en toile", image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=900&q=85", description: "Sneakers en toile souples et légères pour tous les jours.", prix: 549, stock: 21, categorie: "Chaussures" },
 ];
 
+const promotions = [
+  {
+    slug: "details-qui-changent-tout",
+    discountPercent: 30,
+    badge: "JUSQU'À -30%",
+    kicker: "LA PETITE TOUCHE EN PLUS",
+    title: "Les détails qui changent tout",
+    description: "Une sélection d'accessoires pour donner du caractère à vos tenues.",
+    image: "https://images.unsplash.com/photo-1611652022419-a9419f74343d?auto=format&fit=crop&w=1200&q=85",
+    imageAlt: "Sélection de bijoux et accessoires",
+    detailTitle: "Les petits détails, le grand effet",
+    detailDescription: "Un bijou bien choisi suffit à révéler une tenue. Découvrez notre sélection d'accessoires et trouvez la pièce qui vous ressemble.",
+    highlights: ["Jusqu'à 30 % de réduction sur une sélection", "Des accessoires faciles à associer", "Des idées pour offrir ou se faire plaisir"],
+    startDate: new Date("2026-01-01T00:00:00.000Z"),
+    endDate: new Date("2026-12-31T00:00:00.000Z"),
+    isActive: true,
+  },
+  {
+    slug: "eclat-au-quotidien",
+    discountPercent: 20,
+    badge: "-20% SUR LA SÉLECTION",
+    kicker: "UN ÉCLAT À CHAQUE INSTANT",
+    title: "Un éclat au quotidien",
+    description: "Découvrez des pièces faciles à porter et à associer.",
+    image: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=900&q=85",
+    imageAlt: "Bijoux dorés présentés sur un fond clair",
+    detailTitle: "Votre éclat, tous les jours",
+    detailDescription: "Des bijoux délicats à porter seuls ou à accumuler : composez facilement un style qui vous accompagne du matin au soir.",
+    highlights: ["20 % de réduction sur la sélection concernée", "Des pièces à porter seules ou en accumulation", "Des idées pour compléter votre collection"],
+    startDate: new Date("2026-01-01T00:00:00.000Z"),
+    endDate: new Date("2026-12-31T00:00:00.000Z"),
+    isActive: true,
+  },
+  {
+    slug: "sac-ideal",
+    discountPercent: 0,
+    badge: "OFFRE DU MOMENT",
+    kicker: "VOTRE NOUVEAU COMPAGNON",
+    title: "Le sac idéal vous attend",
+    description: "Des modèles pensés pour vous accompagner partout.",
+    image: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=900&q=85",
+    imageAlt: "Sac à main élégant",
+    detailTitle: "Un sac pour vous suivre partout",
+    detailDescription: "Pour vos journées bien remplies ou vos sorties, explorez des modèles pensés pour apporter une touche élégante à votre quotidien.",
+    highlights: ["Une sélection de sacs à découvrir", "Des modèles pour vos journées et vos sorties", "Trouvez votre prochain compagnon du quotidien"],
+    startDate: new Date("2026-01-01T00:00:00.000Z"),
+    endDate: new Date("2026-12-31T00:00:00.000Z"),
+    isActive: true,
+  },
+];
+
 async function main() {
   const passwordHash = await bcrypt.hash("password123", 12);
   const supervisorPasswordHash = await bcrypt.hash("oumaima2026", 12);
@@ -21,10 +72,35 @@ async function main() {
     const email = isSupervisor ? "oumaima@gmail.com" : `${role}@zen.local`;
     await prisma.user.upsert({ where: { email }, update: { username, passwordHash: isSupervisor ? supervisorPasswordHash : passwordHash, role }, create: { username, email, passwordHash: isSupervisor ? supervisorPasswordHash : passwordHash, role } });
   }
+  const promotionIds: Record<string, string> = {};
+  for (const promotion of promotions) {
+    const saved = await prisma.promotion.upsert({
+      where: { slug: promotion.slug },
+      update: promotion,
+      create: promotion,
+      select: { id: true, slug: true },
+    });
+    promotionIds[saved.slug] = saved.id;
+  }
+  const articlePromotions: Record<string, string> = {
+    "a-robe": promotionIds["details-qui-changent-tout"],
+    "a-veste": promotionIds["details-qui-changent-tout"],
+    "a-chemise": promotionIds["eclat-au-quotidien"],
+    "a-pull": promotionIds["eclat-au-quotidien"],
+    "a-sneakers": promotionIds["sac-ideal"],
+    "a-pantalon": promotionIds["sac-ideal"],
+  };
   for (const nom of [...new Set(articles.map((article) => article.categorie))]) {
     await prisma.category.upsert({ where: { nom }, update: {}, create: { nom } });
   }
-  for (const article of articles) await prisma.article.upsert({ where: { id: article.id }, update: article, create: article });
+  for (const article of articles) {
+    const promotionId = articlePromotions[article.id];
+    await prisma.article.upsert({
+      where: { id: article.id },
+      update: { ...article, ...(promotionId ? { promotionId } : {}) },
+      create: { ...article, ...(promotionId ? { promotionId } : {}) },
+    });
+  }
   const knowledge = [
     { id: "kb-livraison", title: "Suivi de livraison", category: "Livraison", content: "Une commande peut être suivie avec sa référence CMD et son statut. Les statuts sont En attente, Validée, Expédiée et Livrée.", status: "publie" },
     { id: "kb-retour", title: "Retours et échanges", category: "Retours", content: "Pour demander un retour ou un échange, le client doit contacter le support avec sa référence de commande et préciser le motif de sa demande.", status: "publie" },

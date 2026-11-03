@@ -16,7 +16,7 @@ router.get("/", asyncHandler(async (req, res) => {
     const page = Math.max(1, Number(req.query.page) || 1);
     const pageSize = Math.min(24, Math.max(1, Number(req.query.pageSize) || 8));
     const search = typeof req.query.q === "string" ? req.query.q.trim() : "";
-    const where = { role: "client", ...(search ? { OR: [{ username: { contains: search, mode: "insensitive" } }, { email: { contains: search, mode: "insensitive" } }] } : {}) };
+    const where = { role: "client", ...(search ? { OR: [{ username: { contains: search } }, { email: { contains: search } }] } : {}) };
     const [clients, total] = await Promise.all([
         prisma.user.findMany({ where, select: publicClient, orderBy: { username: "asc" }, skip: (page - 1) * pageSize, take: pageSize }),
         prisma.user.count({ where }),
