@@ -10,6 +10,7 @@ import categoryRoutes from "./routes/categories.js";
 import orderRoutes from "./routes/orders.js";
 import conversationRoutes from "./routes/conversations.js";
 import promotionRoutes from "./routes/promotions.js";
+import dashboardRoutes from "./routes/dashboard.js";
 export const app = express();
 const allowedOrigins = new Set([config.frontendUrl, "http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"]);
 app.use(cors({ origin: (origin, callback) => {
@@ -28,4 +29,5 @@ app.use("/api/clients", clientRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/conversations", conversationRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 app.use(errorHandler);

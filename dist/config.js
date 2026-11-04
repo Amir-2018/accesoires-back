@@ -1,12 +1,13 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+dotenv.config({ path: ["prisma/.env", ".env"] });
 const required = ["DATABASE_URL", "JWT_SECRET"];
 for (const key of required) {
     if (!process.env[key])
         throw new Error(`Variable d'environnement manquante: ${key}`);
 }
 const databaseUrl = process.env.DATABASE_URL ?? "";
-if (!/^mysql:\/\//i.test(databaseUrl)) {
-    throw new Error("Variable d'environnement invalide: DATABASE_URL. Utilisez une URL MySQL valide, par exemple 'mysql://user:password@localhost:3306/ouou'.");
+if (!/^postgres(?:ql)?:\/\//i.test(databaseUrl)) {
+    throw new Error("Variable d'environnement invalide: DATABASE_URL. Utilisez une URL PostgreSQL valide.");
 }
 export const config = {
     port: Number(process.env.PORT ?? 4000),
