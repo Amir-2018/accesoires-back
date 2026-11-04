@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { assertPromotionExists } from "../lib/article-promotions.js";
 import { asyncHandler, HttpError, routeParam } from "../lib/http.js";
 import { prisma } from "../lib/prisma.js";
-import { articlePromotionFilter, isPromotionInDateRange, promotionSelect, utcToday } from "../lib/promotions.js";
+import { articlePromotionFilter, promotionSelect, utcToday } from "../lib/promotions.js";
 import { authenticate, requireRoles } from "../middleware/auth.js";
 
 const router = Router();
@@ -27,10 +27,6 @@ export const articleInput = z.object({
 });
 
 const articleWithPromotion = { promotion: { select: promotionSelect } };
-function withActivePromotion<T extends { promotion: Parameters<typeof isPromotionInDateRange>[0] | null }>(article: T) {
-  const promotion = article.promotion && isPromotionInDateRange(article.promotion) ? article.promotion : null;
-  return { ...article, promotion };
-}
 
 router.get("/", asyncHandler(async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1);
@@ -48,14 +44,14 @@ router.get("/", asyncHandler(async (req, res) => {
     prisma.article.findMany({ where, include: articleWithPromotion, orderBy: { nom: "asc" }, skip: (page - 1) * pageSize, take: pageSize }),
     prisma.article.count({ where }),
   ]);
-  res.json({ articles: articles.map(withActivePromotion), pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } });
+  res.json({ articles, pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } });
 }));
 
 router.get("/:id", asyncHandler(async (req, res) => {
   const id = routeParam(req.params.id, "id");
   const article = await prisma.article.findUnique({ where: { id }, include: articleWithPromotion });
   if (!article) throw new HttpError(404, "Article introuvable.");
-  res.json({ article: withActivePromotion(article) });
+  res.json({ article });
 }));
 
 router.post("/", authenticate, requireRoles("supervisor"), asyncHandler(async (req, res) => {
@@ -67,7 +63,7 @@ router.post("/", authenticate, requireRoles("supervisor"), asyncHandler(async (r
     await assertPromotionExists(input.promotionId, async (id) => tx.promotion.findUnique({ where: { id }, select: { id: true } }));
     return tx.article.create({ data: input, include: articleWithPromotion });
   });
-  res.status(201).json({ article: withActivePromotion(article) });
+  res.status(201).json({ article });
 }));
 
 router.patch("/:id", authenticate, requireRoles("supervisor"), asyncHandler(async (req, res) => {
@@ -87,7 +83,7 @@ router.patch("/:id", authenticate, requireRoles("supervisor"), asyncHandler(asyn
       throw error;
     }
   });
-  res.json({ article: withActivePromotion(article) });
+  res.json({ article });
 }));
 
 router.delete("/:id", authenticate, requireRoles("supervisor"), asyncHandler(async (req, res) => {

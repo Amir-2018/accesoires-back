@@ -1,0 +1,10 @@
+ALTER TABLE `Promotion`
+    DROP COLUMN `badge`,
+    DROP COLUMN `kicker`,
+    DROP COLUMN `description`,
+    DROP COLUMN `image`,
+    DROP COLUMN `imageAlt`,
+    DROP COLUMN `detailTitle`,
+    DROP COLUMN `detailDescription`,
+    DROP COLUMN `highlights`,
+    DROP COLUMN `isActive`;

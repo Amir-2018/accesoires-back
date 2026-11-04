@@ -10,7 +10,7 @@ const router = Router();
 const itemInput = z.object({ articleId: z.string().min(1), quantite: z.number().int().positive().max(99) });
 const orderInput = z.object({
     items: z.array(itemInput).min(1).refine((items) => new Set(items.map((item) => item.articleId)).size === items.length, "Un article ne peut apparaître qu’une fois dans le panier."),
-    promotionSlug: z.string().trim().min(2).max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).nullable().optional(),
+    promotionSlug: z.string().trim().min(2).max(191).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).nullable().optional(),
     nom: z.string().min(1).max(80),
     prenom: z.string().min(1).max(80),
     email: z.string().email(),
@@ -38,7 +38,8 @@ async function createOrder(input, clientId) {
     const token = clientId ? null : createGuestToken();
     const guestTokenHash = token ? hashToken(token) : null;
     const order = await prisma.$transaction(async (tx) => {
-        const today = utcToday();
+        const now = new Date();
+        const today = utcToday(now);
         const articles = await tx.article.findMany({
             where: { id: { in: input.items.map((item) => item.articleId) } },
             include: { promotion: true },
@@ -56,7 +57,7 @@ async function createOrder(input, clientId) {
                 throw new HttpError(400, "Aucun article du panier ne bénéficie de cette promotion.");
             }
         }
-        const pricing = calculateOrderPricing(input.items, articles);
+        const pricing = calculateOrderPricing(input.items, articles, now);
         const items = [];
         for (const requested of input.items) {
             const article = articles.find((candidate) => candidate.id === requested.articleId);

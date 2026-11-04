@@ -2,39 +2,33 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { articlePromotionFilter, discountedUnitPrice, isPromotionInDateRange, utcToday } from "./promotions.js";
 import { articleInput } from "../routes/articles.js";
-import { promotionImageSchema, promotionInput } from "../routes/promotions.js";
+import { promotionAdminPatchInput, promotionInput } from "../routes/promotions.js";
+import { promotionSlugFromTitle } from "./promotion-slug.js";
 import { requireRoles } from "../middleware/auth.js";
 import { HttpError } from "./http.js";
 import { assertPromotionExists } from "./article-promotions.js";
 import { calculateOrderPricing } from "./order-pricing.js";
 const validPromotion = {
-    slug: "eclat-au-quotidien",
-    discountPercent: 20,
-    badge: "-20%",
-    kicker: "Une offre",
     title: "Un éclat au quotidien",
-    description: "Une sélection à découvrir.",
-    image: "https://example.com/promotion.jpg",
-    imageAlt: "Bijoux dorés",
-    detailTitle: "Votre éclat",
-    detailDescription: "Des bijoux à porter tous les jours.",
-    highlights: ["20 % sur la sélection"],
+    discountPercent: 20,
     startDate: "2026-11-03",
     endDate: "2026-11-30",
-    isActive: true,
 };
-test("promotion input validates dates, discount, URL, and non-empty highlights", () => {
+test("promotion input validates only the four business fields and date range", () => {
     assert.equal(promotionInput.safeParse(validPromotion).success, true);
+    for (const discountPercent of [15, 50, 70]) {
+        assert.equal(promotionInput.safeParse({ ...validPromotion, discountPercent }).success, true);
+    }
     assert.equal(promotionInput.safeParse({ ...validPromotion, discountPercent: 101 }).success, false);
     assert.equal(promotionInput.safeParse({ ...validPromotion, endDate: "2026-11-02" }).success, false);
-    assert.equal(promotionInput.safeParse({ ...validPromotion, image: "javascript:alert(1)" }).success, false);
-    assert.equal(promotionInput.safeParse({ ...validPromotion, highlights: [" "] }).success, false);
+    assert.equal(promotionInput.safeParse({ ...validPromotion, slug: "client-slug" }).success, false);
+    assert.equal(promotionInput.safeParse({ ...validPromotion, discountPercent: 20.5 }).success, false);
+    assert.equal(promotionAdminPatchInput.safeParse({ isActive: false }).success, true);
+    assert.equal(promotionAdminPatchInput.safeParse({ isActive: "false" }).success, false);
 });
-test("promotion images accept local image uploads and reject unsupported or oversized data", () => {
-    assert.equal(promotionImageSchema.safeParse("data:image/png;base64,AQ==").success, true);
-    assert.equal(promotionImageSchema.safeParse("https://example.com/promotion.jpg").success, true);
-    assert.equal(promotionImageSchema.safeParse("data:image/svg+xml;base64,PHN2Zz4=").success, false);
-    assert.equal(promotionImageSchema.safeParse(`data:image/png;base64,${"A".repeat(8_388_612)}`).success, false);
+test("promotion slugs are generated from titles and support accents", () => {
+    assert.equal(promotionSlugFromTitle("Les détails qui changent tout"), "les-details-qui-changent-tout");
+    assert.equal(promotionSlugFromTitle("!!!"), "promotion");
 });
 test("promotion validity includes both date endpoints in UTC", () => {
     const promotion = {
@@ -46,11 +40,38 @@ test("promotion validity includes both date endpoints in UTC", () => {
     assert.equal(isPromotionInDateRange(promotion, new Date("2026-11-04T00:00:00.000Z")), false);
     assert.equal(isPromotionInDateRange({ ...promotion, isActive: false }, new Date("2026-11-03T12:00:00.000Z")), false);
 });
-test("discount calculation matches the shop's three-decimal unit-price rule", () => {
+test("15%, 50%, and 70% promotions use the stored percentage for unit and order totals", () => {
+    const rates = [
+        { discountPercent: 15, unitPrice: 296.65, totalForTwo: 593.3, discountForTwo: 104.7 },
+        { discountPercent: 50, unitPrice: 174.5, totalForTwo: 349, discountForTwo: 349 },
+        { discountPercent: 70, unitPrice: 104.7, totalForTwo: 209.4, discountForTwo: 488.6 },
+    ];
+    for (const { discountPercent, unitPrice, totalForTwo, discountForTwo } of rates) {
+        assert.equal(discountedUnitPrice(349, discountPercent), unitPrice);
+        for (const quantite of [1, 2]) {
+            const pricing = calculateOrderPricing([{ articleId: `a-${discountPercent}`, quantite }], [{
+                    id: `a-${discountPercent}`,
+                    nom: `${discountPercent}% article`,
+                    prix: 349,
+                    promotion: {
+                        slug: `offer-${discountPercent}`,
+                        discountPercent,
+                        startDate: new Date("2026-11-04T00:00:00.000Z"),
+                        endDate: new Date("2026-11-30T00:00:00.000Z"),
+                        isActive: true,
+                    },
+                }], new Date("2026-11-04T12:00:00.000Z"));
+            assert.equal(pricing.items[0].discountPercent, discountPercent);
+            assert.equal(pricing.items[0].prix, unitPrice);
+            assert.equal(pricing.total, quantite === 1 ? unitPrice : totalForTwo);
+            assert.equal(pricing.discountTotal, quantite === 1 ? Math.round((349 - unitPrice) * 1000) / 1000 : discountForTwo);
+        }
+    }
     assert.equal(discountedUnitPrice(349, 20), 279.2);
+    assert.equal(discountedUnitPrice(100, 15), 85);
     assert.equal(discountedUnitPrice(10, 33), 6.7);
 });
-test("promotion filtering scopes article queries to active offers and inclusive UTC dates", () => {
+test("promotion filtering scopes article queries to inclusive UTC dates", () => {
     const where = articlePromotionFilter("eclat-au-quotidien", utcToday(new Date("2026-11-03T23:59:59.000Z")));
     assert.deepEqual(where, {
         promotion: {
@@ -80,7 +101,7 @@ test("article promotion association accepts a cleared value and rejects an unkno
     await assert.rejects(assertPromotionExists("missing", async () => null), (error) => error instanceof HttpError && error.status === 400);
     await assertPromotionExists("promotion-1", async (id) => ({ id }));
 });
-test("order price snapshots match frontend discounts and exclude inactive promotions", () => {
+test("order price snapshots match frontend discounts and exclude out-of-period promotions", () => {
     const pricing = calculateOrderPricing([{ articleId: "a-discount", quantite: 3 }, { articleId: "a-inactive", quantite: 2 }], [
         {
             id: "a-discount",
@@ -102,11 +123,11 @@ test("order price snapshots match frontend discounts and exclude inactive promot
                 slug: "inactive",
                 discountPercent: 50,
                 startDate: new Date("2026-11-01T00:00:00.000Z"),
-                endDate: new Date("2026-11-30T00:00:00.000Z"),
-                isActive: false,
+                endDate: new Date("2026-10-31T00:00:00.000Z"),
+                isActive: true,
             },
         },
-    ]);
+    ], new Date("2026-11-04T12:00:00.000Z"));
     assert.equal(pricing.subtotal, 40);
     assert.equal(pricing.total, 30.1);
     assert.equal(pricing.discountTotal, 9.9);

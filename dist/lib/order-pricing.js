@@ -1,13 +1,13 @@
 import { HttpError } from "./http.js";
 import { discountedUnitPrice, isPromotionInDateRange } from "./promotions.js";
-export function calculateOrderPricing(requestedItems, articles) {
+export function calculateOrderPricing(requestedItems, articles, now = new Date()) {
     if (articles.length !== requestedItems.length)
         throw new HttpError(400, "Un article demandé est introuvable.");
     const items = requestedItems.map((requested) => {
         const article = articles.find((candidate) => candidate.id === requested.articleId);
         if (!article)
             throw new HttpError(400, "Un article demandé est introuvable.");
-        const promotion = article.promotion && isPromotionInDateRange(article.promotion) ? article.promotion : null;
+        const promotion = article.promotion && isPromotionInDateRange(article.promotion, now) ? article.promotion : null;
         const discountPercent = promotion?.discountPercent ?? 0;
         return {
             articleId: article.id,

@@ -10,7 +10,7 @@ cp backend/.env.example backend/.env
 
 Configurer au minimum `DATABASE_URL` et `JWT_SECRET`. La valeur `DATABASE_URL` doit commencer par `mysql://`; par exemple `mysql://user:password@127.0.0.1:3306/ouou`. Ne jamais committer `backend/.env`.
 
-Les promotions sont actives du début à la fin de leur période, dates incluses. Le backend évalue ces dates en UTC. Les images de promotion peuvent être envoyées depuis le formulaire superviseur (PNG, JPG, WebP ou GIF, 6 Mo maximum). Après une modification du schéma, appliquer `npm run prisma:push` ou les migrations SQL dans `prisma/migrations`, puis régénérer le client Prisma et lancer `npm run prisma:seed`.
+Les promotions comportent un titre, une remise et une période inclusive évaluée en UTC. Le backend génère leur slug depuis le titre. L’image est celle de l’article associé, pas de la promotion. Après une modification du schéma, appliquer les migrations SQL dans `prisma/migrations` ou `npm run prisma:push`, puis régénérer Prisma Client.
 
 Depuis la racine du dépôt :
 
@@ -27,7 +27,7 @@ L’API écoute par défaut sur `http://localhost:4000`.
 
 - Authentification : `/api/auth/*`
 - Catalogue : `/api/articles/*`
-- Promotions publiques : `GET /api/promotions` et `GET /api/promotions/:slug`; gestion réservée aux superviseurs sous `/api/promotions/admin` et pour les écritures.
+- Promotions publiques : `GET /api/promotions` et `GET /api/promotions/:slug`; gestion superviseur : `GET /api/promotions/admin`, `POST /api/promotions`, `PATCH /api/promotions/:id` et `DELETE /api/promotions/:id`.
 - Commandes et messages : `/api/orders/*`
 - Conversations, brouillons, validation, envoi et escalade : `/api/conversations/*`
 - FAQ CRUD et recherche : `/api/conversations/knowledge/articles`

@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { PrismaClient, UserRole } from "@prisma/client";
+import { promotionSlugFromTitle } from "../src/lib/promotion-slug.js";
 
 const prisma = new PrismaClient();
 
@@ -14,52 +15,22 @@ const articles = [
 
 const promotions = [
   {
-    slug: "details-qui-changent-tout",
-    discountPercent: 30,
-    badge: "JUSQU'À -30%",
-    kicker: "LA PETITE TOUCHE EN PLUS",
     title: "Les détails qui changent tout",
-    description: "Une sélection d'accessoires pour donner du caractère à vos tenues.",
-    image: "https://images.unsplash.com/photo-1611652022419-a9419f74343d?auto=format&fit=crop&w=1200&q=85",
-    imageAlt: "Sélection de bijoux et accessoires",
-    detailTitle: "Les petits détails, le grand effet",
-    detailDescription: "Un bijou bien choisi suffit à révéler une tenue. Découvrez notre sélection d'accessoires et trouvez la pièce qui vous ressemble.",
-    highlights: ["Jusqu'à 30 % de réduction sur une sélection", "Des accessoires faciles à associer", "Des idées pour offrir ou se faire plaisir"],
+    discountPercent: 30,
     startDate: new Date("2026-01-01T00:00:00.000Z"),
     endDate: new Date("2026-12-31T00:00:00.000Z"),
-    isActive: true,
   },
   {
-    slug: "eclat-au-quotidien",
-    discountPercent: 20,
-    badge: "-20% SUR LA SÉLECTION",
-    kicker: "UN ÉCLAT À CHAQUE INSTANT",
     title: "Un éclat au quotidien",
-    description: "Découvrez des pièces faciles à porter et à associer.",
-    image: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?auto=format&fit=crop&w=900&q=85",
-    imageAlt: "Bijoux dorés présentés sur un fond clair",
-    detailTitle: "Votre éclat, tous les jours",
-    detailDescription: "Des bijoux délicats à porter seuls ou à accumuler : composez facilement un style qui vous accompagne du matin au soir.",
-    highlights: ["20 % de réduction sur la sélection concernée", "Des pièces à porter seules ou en accumulation", "Des idées pour compléter votre collection"],
+    discountPercent: 20,
     startDate: new Date("2026-01-01T00:00:00.000Z"),
     endDate: new Date("2026-12-31T00:00:00.000Z"),
-    isActive: true,
   },
   {
-    slug: "sac-ideal",
-    discountPercent: 0,
-    badge: "OFFRE DU MOMENT",
-    kicker: "VOTRE NOUVEAU COMPAGNON",
     title: "Le sac idéal vous attend",
-    description: "Des modèles pensés pour vous accompagner partout.",
-    image: "https://images.unsplash.com/photo-1584917865442-de89df76afd3?auto=format&fit=crop&w=900&q=85",
-    imageAlt: "Sac à main élégant",
-    detailTitle: "Un sac pour vous suivre partout",
-    detailDescription: "Pour vos journées bien remplies ou vos sorties, explorez des modèles pensés pour apporter une touche élégante à votre quotidien.",
-    highlights: ["Une sélection de sacs à découvrir", "Des modèles pour vos journées et vos sorties", "Trouvez votre prochain compagnon du quotidien"],
+    discountPercent: 0,
     startDate: new Date("2026-01-01T00:00:00.000Z"),
     endDate: new Date("2026-12-31T00:00:00.000Z"),
-    isActive: true,
   },
 ];
 
@@ -72,23 +43,32 @@ async function main() {
     const email = isSupervisor ? "oumaima@gmail.com" : `${role}@zen.local`;
     await prisma.user.upsert({ where: { email }, update: { username, passwordHash: isSupervisor ? supervisorPasswordHash : passwordHash, role }, create: { username, email, passwordHash: isSupervisor ? supervisorPasswordHash : passwordHash, role } });
   }
-  const promotionIds: Record<string, string> = {};
+  const promotionIds = new Map<string, string>();
   for (const promotion of promotions) {
-    const saved = await prisma.promotion.upsert({
-      where: { slug: promotion.slug },
-      update: promotion,
-      create: promotion,
-      select: { id: true, slug: true },
-    });
-    promotionIds[saved.slug] = saved.id;
+    const slug = promotionSlugFromTitle(promotion.title);
+    const existing = await prisma.promotion.findFirst({ where: { title: promotion.title }, select: { id: true } });
+    const saved = existing
+      ? await prisma.promotion.update({ where: { id: existing.id }, data: { ...promotion, slug }, select: { id: true } })
+      : await prisma.promotion.upsert({
+        where: { slug },
+        update: promotion,
+        create: { ...promotion, slug },
+        select: { id: true },
+      });
+    promotionIds.set(promotion.title, saved.id);
   }
+  const promotionId = (title: string) => {
+    const id = promotionIds.get(title);
+    if (!id) throw new Error(`Promotion manquante dans le seed : ${title}`);
+    return id;
+  };
   const articlePromotions: Record<string, string> = {
-    "a-robe": promotionIds["details-qui-changent-tout"],
-    "a-veste": promotionIds["details-qui-changent-tout"],
-    "a-chemise": promotionIds["eclat-au-quotidien"],
-    "a-pull": promotionIds["eclat-au-quotidien"],
-    "a-sneakers": promotionIds["sac-ideal"],
-    "a-pantalon": promotionIds["sac-ideal"],
+    "a-robe": promotionId("Les détails qui changent tout"),
+    "a-veste": promotionId("Les détails qui changent tout"),
+    "a-chemise": promotionId("Un éclat au quotidien"),
+    "a-pull": promotionId("Un éclat au quotidien"),
+    "a-sneakers": promotionId("Le sac idéal vous attend"),
+    "a-pantalon": promotionId("Le sac idéal vous attend"),
   };
   for (const nom of [...new Set(articles.map((article) => article.categorie))]) {
     await prisma.category.upsert({ where: { nom }, update: {}, create: { nom } });
