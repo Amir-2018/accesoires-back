@@ -1,8 +1,7 @@
 import bcrypt from "bcryptjs";
 import { PrismaClient, UserRole } from "@prisma/client";
 import { promotionSlugFromTitle } from "../src/lib/promotion-slug.js";
-
-const prisma = new PrismaClient();
+import { prisma } from "../src/lib/prisma.js";
 
 const articles = [
   { id: "a-robe", nom: "Robe fluide", image: "https://images.unsplash.com/photo-1595777457583-95e059d581b8?auto=format&fit=crop&w=900&q=85", description: "Robe légère à la coupe élégante, parfaite au quotidien.", prix: 499, stock: 16, categorie: "Robes" },
