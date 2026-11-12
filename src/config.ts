@@ -4,6 +4,7 @@ dotenv.config({ path: ["prisma/.env", ".env"] });
 
 const required = ["DATABASE_URL", "JWT_SECRET"] as const;
 for (const key of required) {
+  
   if (!process.env[key]) throw new Error(`Variable d'environnement manquante: ${key}`);
 }
 

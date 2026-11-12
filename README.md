@@ -36,14 +36,22 @@ The container expects a reachable PostgreSQL database; provide `DATABASE_URL`,
 into the image. Apply pending database migrations before starting a new version:
 
 ```bash
-docker run --rm -e DATABASE_URL="$DATABASE_URL" zen-backend npm run prisma:migrate
-docker run -d --name zen-backend --restart unless-stopped \
-  -p 4000:4000 \
-  -e DATABASE_URL="$DATABASE_URL" \
-  -e JWT_SECRET="$JWT_SECRET" \
-  -e FRONTEND_URL="$FRONTEND_URL" \
-  zen-backend
+cp .env.example .env
+# Set the real DATABASE_URL, JWT_SECRET, and FRONTEND_URL values in .env.
+docker compose run --build --rm backend npm run prisma:migrate
+docker compose up -d --build
 ```
+
+Docker Compose passes the host `.env` values into the container; it does not
+copy the file into the image. On a server platform that deploys the image
+directly, set `DATABASE_URL` and `JWT_SECRET` (and `FRONTEND_URL` as needed) in
+the platform's environment-variable settings instead. `DATABASE_URL` must point
+to a reachable PostgreSQL database.
+
+If `prisma migrate deploy` reports `P1001`, verify the database is running and
+that the host in `DATABASE_URL` is externally reachable from the Docker server.
+For a Render database, use its external connection URL unless the container is
+running inside the same Render private network.
 
 The API health check is available at `http://localhost:4000/api/health`.
 For a remote server, build and push the image to a container registry, then pull
