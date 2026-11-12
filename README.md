@@ -23,6 +23,33 @@ pnpm --dir backend dev
 
 L’API écoute par défaut sur `http://localhost:4000`.
 
+## Docker
+
+Build the production image from the repository root:
+
+```bash
+docker build -t zen-backend .
+```
+
+The container expects a reachable PostgreSQL database; provide `DATABASE_URL`,
+`JWT_SECRET`, and `FRONTEND_URL` at runtime rather than copying a `.env` file
+into the image. Apply pending database migrations before starting a new version:
+
+```bash
+docker run --rm -e DATABASE_URL="$DATABASE_URL" zen-backend npm run prisma:migrate
+docker run -d --name zen-backend --restart unless-stopped \
+  -p 4000:4000 \
+  -e DATABASE_URL="$DATABASE_URL" \
+  -e JWT_SECRET="$JWT_SECRET" \
+  -e FRONTEND_URL="$FRONTEND_URL" \
+  zen-backend
+```
+
+The API health check is available at `http://localhost:4000/api/health`.
+For a remote server, build and push the image to a container registry, then pull
+and run that tagged image on the server with the same environment variables and
+network access to PostgreSQL.
+
 ## Routes principales
 
 - Authentification : `/api/auth/*`
