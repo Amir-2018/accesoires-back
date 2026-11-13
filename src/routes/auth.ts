@@ -35,15 +35,17 @@ router.post("/register", asyncHandler(async (req, res) => {
 }));
 
 router.post("/login", asyncHandler(async (req, res) => {
+  console.log('mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm')
   const input = credentials.parse(req.body);
   const user = await prisma.user.findFirst({ where: { OR: [{ email: input.identifier }, { username: input.identifier }] } });
   if (!user || !(await bcrypt.compare(input.password, user.passwordHash))) {
     throw new HttpError(401, "Email ou mot de passe incorrect.");
   }
   const token = await createAccessToken(user.id, user.role);
+  console.log("Token generated:", token); // Log the generated token for debugging
   setSessionCookie(res, token);
   const { passwordHash: _passwordHash, ...safeUser } = user;
-  res.json({ user: safeUser });
+  res.json({ user: safeUser ,token  : token});
 }));
 
 router.get("/me", authenticate, asyncHandler(async (req, res) => {
